@@ -4,5 +4,5 @@ Append one row per connector deployment. Keep this file current — it is the ha
 
 | Date | Project | Connector | Cloud Run URL (/mcp) | Image tag | Agent Registry id | GE data store added by | Verified in GE by (Telix user) | Notes |
 |---|---|---|---|---|---|---|---|---|
-| 2026-11-10 | eg-telix (Google Argolis reference) | pubcrawl | https://mcp-pubcrawl-258595268849.europe-west4.run.app/mcp | …/pubcrawl:latest | `mcp-pubcrawl` @ eu | admin@ (2026-11-10 19:00 PT) — Reload custom actions OK, Enable actions ×all | 14 tools; search_pubmed OK |
-| 2026-11-10 | eg-telix (Google Argolis reference) | opentargets | https://mcp-opentargets-258595268849.europe-west4.run.app/mcp | …/opentargets:latest | `mcp-opentargets` @ eu | admin@ (2026-11-10 19:00 PT) — Reload custom actions OK, Enable actions ×all | 5 tools; search_entities OK |
+| 2026-11-10 | eg-telix (Google Argolis reference) | pubcrawl | https://mcp-pubcrawl-258595268849.europe-west4.run.app/mcp | …/pubcrawl:latest | `mcp-pubcrawl` @ eu | admin@ (2026-11-10 19:00 PT) — Reload custom actions OK, Enable actions ×all; chat test OK 19:20 PT | 14 tools; search_pubmed OK |
+| 2026-11-10 | eg-telix (Google Argolis reference) | opentargets | https://mcp-opentargets-258595268849.europe-west4.run.app/mcp | …/opentargets:latest | `mcp-opentargets` @ eu | admin@ (2026-11-10 19:00 PT) — Reload custom actions OK, Enable actions ×all; chat test OK 19:20 PT | 5 tools; search_entities OK |
