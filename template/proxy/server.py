@@ -101,6 +101,21 @@ async def healthz(_: Request):
 
 app = mcp.http_app(path="/mcp", middleware=[Middleware(GoogleIdTokenAuth)])
 
+
+class RootToMcp:
+    """Serve MCP at '/' as well as '/mcp' so a URL pasted without the path still works."""
+
+    def __init__(self, inner):
+        self.inner = inner
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") == "http" and scope.get("path") in ("", "/"):
+            scope = dict(scope, path="/mcp", raw_path=b"/mcp")
+        await self.inner(scope, receive, send)
+
+
+app = RootToMcp(app)
+
 if __name__ == "__main__":
     import uvicorn
 

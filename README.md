@@ -109,27 +109,31 @@ template/deploy.sh clinicaltrials --allow-caller "$GE_SA"     # idempotent; adds
 - [ ] **T5.2** If the GE app lives in a *different* project than the connectors, use **that** project's number for `GE_SA` and grant it on each connector service.
 - [ ] **T5.3** Two more managed constraints can block the connector even with T0.1 done — a Telix Org Policy Admin confirms:
   `constraints/discoveryengine.managed.allowedDataSources` allows `custom_mcp` (or is unset), and
-  `constraints/discoveryengine.managed.allowedEgressFqdns` is unset **or** lists each connector host (e.g. `mcp-clinicaltrials-<n>.europe-west4.run.app`).
+  `constraints/discoveryengine.managed.allowedEgressFqdns` is unset **or** lists each connector host (e.g. `mcp-clinicaltrials-<PROJECT_NUMBER>.europe-west4.run.app`).
   Also `gcloud services enable connectors.googleapis.com --project=$PROJECT_ID`.
 
 ## 6. Add the connector to the Telix GE app (console, 5 min)
 
 **🔒 TELIX TENANT — performed by a GE admin (Jellen) with you on a call**
-1. Google Cloud console → **Gemini Enterprise** → **Apps** → click the Telix app.
+1. Google Cloud console → product **AI Applications** (left nav: *Apps · Data Stores · Billing · Monitoring · Settings*) → **Apps** → click the Telix app (row shows *Type: Gemini Enterprise, Location: eu*).
 2. Left nav **Connected data stores** → **+ New data store** (opens *Select a data source*).
 3. Scroll to the **MCP servers** group → tile **Custom MCP Server**.
-4. Form: **MCP server URL** = `https://mcp-clinicaltrials-<n>.europe-west4.run.app/mcp` (must be the `*.run.app` URL, must end in `/mcp`, Streamable HTTP; SSE is not supported).
+4. Form: **MCP server URL** = the exact URL printed by `deploy.sh` (or `gcloud run services describe mcp-clinicaltrials --region=$REGION --format='value(status.url)'`) **plus `/mcp`**, e.g. `https://mcp-clinicaltrials-<PROJECT_NUMBER>.europe-west4.run.app/mcp`. Paste the real URL, never a placeholder (must be the `*.run.app` URL, must end in `/mcp`, Streamable HTTP; SSE is not supported).
    **Authentication**: choose **No authentication** for the public‑data connectors (Cloud Run IAM + the service‑agent token are what secure it; do **not** configure OAuth 2.0 — there is no IdP for public data).
    **Data store name**: `clinicaltrials` (keep it short — it becomes the connector name users see).
-5. **Create**. Open the new data store → **Actions** tab → click **Reload custom actions** → toggle **ON** the four tools (new custom‑MCP actions are off by default; max 100 per server).
+5. **Create**. Open the new data store → **Actions** → click **Reload custom actions**. When the tool list appears, click **Enable actions** and select all four (actions are *disabled* until you do this; max 100 per server).
 6. Compare the tool names with `servers/clinicaltrials/tools.json`.
 - [ ] **T6.1** Screenshot of the data store with actions enabled → PoC folder.
 - [ ] **T6.2** *Custom MCP Server* tile missing/greyed → T0.1 or T5.3 not done, or the signed‑in admin lacks `roles/discoveryengine.admin`.
-- [ ] **T6.3** **Reload custom actions** shows an error → open Chrome DevTools → Network → the `:refreshDataConnectorTools` response `details` block says why: `"Operation denied by org policy"` → T0.1/T5.3; `401/403` → T5.1 invoker grant or non‑`run.app` URL; `Session terminated` → URL missing `/mcp`.
+- [ ] **T6.3** **Reload custom actions** shows an error → open Chrome DevTools → Network → the `:refreshDataConnectorTools` response `details` block says why: `"Operation denied by org policy"` → T0.1/T5.3; `401/403` → T5.1 invoker grant or non‑`run.app` URL; `HTTP 404 … Not Found` → URL missing `/mcp` (connectors built from this template after 2026‑11‑10 also accept the root URL); `HTTP 400 … Error 400 (Bad Request)` with host `mcp-…-%3Cn%3E…` → a placeholder was pasted instead of the real URL.
 
 ## 7. Verify from a Telix user account (5 min)
 
 **🔒 TELIX TENANT — a Telix researcher (David Han / Iva Kulic) runs this in the GE web app**
+0. In the chat box click the **connector** icon (puzzle piece, next to **+**). Under **Custom MCP (n)** the new connectors appear by name (*Clinicaltrials*, *Pubcrawl*, *Opentargets*) with toggles on; **Enable all connectors** is at the top. This is what success looks like:
+
+   ![GE web app connectors](docs/images/ge-webapp-custom-mcp-connectors.jpg)
+
 1. New chat → prompt: *"Using the ClinicalTrials connector, list recruiting phase 2/3 trials of 177Lu‑PSMA in Australia and summarise sponsors."*
 2. Expect tool calls to `search_trials` and a table with NCT ids (e.g. NCT06520345 — Telix's own TLX591 study).
 3. Agent Designer → new agent → *Tools & Integrations* → authorise the connector → save as **"Radiopharma Evidence Agent"** → share with the R&D group.
