@@ -18,7 +18,7 @@ ARGS=(agent-registry services create "${SERVICE}"
   --interfaces="url=${URL}/mcp,protocolBinding=jsonrpc")
 
 if [[ -f "${TOOLS_FILE}" ]]; then
-  ARGS+=(--mcp-server-spec-type=tool-spec --mcp-server-spec-content="$(cat "${TOOLS_FILE}")")
+  ARGS+=(--mcp-server-spec-type=tool-spec --mcp-server-spec-content="${TOOLS_FILE}")   # gcloud reads JSON from the file path
 else
   ARGS+=(--mcp-server-spec-type=no-spec)
 fi

@@ -23,5 +23,21 @@ curl -fsS "${H[@]}" -H "Mcp-Session-Id: ${SID}" "${URL}/mcp" -d '{"jsonrpc":"2.0
 import sys,json,pathlib
 d=json.load(sys.stdin)["result"]; tools=[{k:v for k,v in t.items() if k!="_meta"} for t in d["tools"]]
 print(f"{len(tools)} tools:"); [print(" -", t["name"]) for t in tools]
-pathlib.Path("servers/'"${SERVER}"'/tools.json").write_text(json.dumps({"tools":tools},indent=1)[:9500])
-print("wrote servers/'"${SERVER}"'/tools.json (for Agent Registry tool-spec)")'
+# Agent Registry tool-spec is capped at 10 KB: keep full spec if it fits, else a compact one (name, 1-line description,
+# annotations, schema with descriptions stripped); if still too big, write no spec (register.sh falls back to no-spec).
+def compact(t):
+    sch=json.loads(json.dumps(t.get("inputSchema",{})))
+    def strip(o):
+        if isinstance(o,dict):
+            o.pop("description",None); [strip(v) for v in o.values()]
+        elif isinstance(o,list): [strip(v) for v in o]
+        return o
+    return {"name":t["name"],"description":(t.get("description") or "").strip().split("\n")[0][:200],
+            "inputSchema":strip(sch),**({"annotations":t["annotations"]} if t.get("annotations") else {})}
+out=pathlib.Path("servers/'"${SERVER}"'/tools.json")
+for cand,label in ((tools,"full"),([compact(t) for t in tools],"compact")):
+    body=json.dumps({"tools":cand},separators=(",",":"))
+    if len(body.encode())<=10000:
+        out.write_text(body); print(f"wrote {out} ({label}, {len(body)} bytes) for Agent Registry tool-spec"); break
+else:
+    out.unlink(missing_ok=True); print("tool spec >10 KB even when compacted; register.sh will use no-spec")'

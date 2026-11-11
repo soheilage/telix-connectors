@@ -60,12 +60,14 @@ if [[ -f "${SRV_DIR}/secrets.txt" ]]; then
 fi
 
 echo "== Deploy"
+# REQUIRE_AUTH=false: Cloud Run IAM (--no-allow-unauthenticated + roles/run.invoker) is the gate. Gemini Enterprise
+# sends its OIDC token in X-Serverless-Authorization, which Cloud Run validates and consumes before the app sees it.
 gcloud run deploy "${SERVICE}" \
   --image="${IMAGE}" --region="${REGION}" --platform=managed \
   --service-account="${SA_EMAIL}" \
   --no-allow-unauthenticated --ingress=all \
   --port=8080 --cpu=1 --memory=1Gi --min-instances=0 --max-instances=3 --timeout=300 \
-  --set-env-vars="SERVER_NAME=${SERVER},REQUIRE_AUTH=true" \
+  --set-env-vars="SERVER_NAME=${SERVER},REQUIRE_AUTH=false" \
   --labels="app=mcp-connector,server=${SERVER},owner=telix-poc" \
   "${SECRET_FLAGS[@]}" --quiet
 

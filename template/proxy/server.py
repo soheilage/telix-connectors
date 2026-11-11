@@ -13,7 +13,11 @@ Configuration (env):
   UPSTREAM_HEADERS    JSON object of extra headers for mode B
   AUDIENCE            Expected ID-token audience (the Cloud Run service URL)
   ALLOWED_PRINCIPALS  Comma-separated SA emails allowed to call (optional)
-  REQUIRE_AUTH        "true" (default) | "false" for local testing
+  REQUIRE_AUTH        "true" (default) verifies a Google ID token in Authorization.
+                      Set "false" on Cloud Run with --no-allow-unauthenticated: Cloud Run IAM
+                      already authenticates callers (Gemini Enterprise sends its OIDC token in
+                      X-Serverless-Authorization, which Cloud Run consumes before the request
+                      reaches this app). Keep "true" only for non-Cloud Run hosting.
   PORT                default 8080
 """
 

@@ -64,8 +64,7 @@ What it does: enables APIs → creates Artifact Registry repo `mcp-connectors` �
 `mcp-clinicaltrials@…` (no project roles) → Cloud Build → Cloud Run `mcp-clinicaltrials`
 (private, EU, 0–3 instances) → pins `AUDIENCE` to the service URL. It prints the `…/mcp` URL — **record it**.
 
-For PubCrawl / Open Targets first pin the upstream commit in `servers/<name>/install.sh` (see `SOURCES.md`),
-and for PubCrawl create the optional secret:
+PubCrawl (14 tools) and Open Targets (5 tools) are already pinned and tested (`SOURCES.md`). For PubCrawl optionally create the NCBI key secret first (deploy works without it):
 ```bash
 gcloud secrets create ncbi-api-key --replication-policy=automatic
 printf '%s' "<KEY>" | gcloud secrets versions add ncbi-api-key --data-file=-
@@ -94,7 +93,10 @@ Registration is metadata only (discovery/governance); it does not grant access. 
 
 ## 5. Grant Gemini Enterprise permission to call the connector
 
-GE invokes the Cloud Run URL with a Google‑signed identity token from the **Discovery Engine service agent** of the GE project.
+How GE authenticates to a Cloud Run‑hosted MCP server (from Google Cloud Support guidance): GE attaches a Google OIDC
+token for the **Discovery Engine service agent** in the `X-Serverless-Authorization` header. Cloud Run IAM validates it
+**only if** (a) the MCP URL is the default `*.run.app` domain (no custom domains) and (b) that service agent has
+`roles/run.invoker` on the service. The connector itself therefore relies on Cloud Run IAM (`REQUIRE_AUTH=false`).
 
 ```bash
 PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
@@ -103,22 +105,27 @@ template/deploy.sh clinicaltrials --allow-caller "$GE_SA"     # idempotent; adds
 ```
 
 **🔒 TELIX TENANT — confirm**
-- [ ] **T5.1** The service agent exists: `gcloud iam service-accounts describe "$GE_SA"` (it is created when the GE app was first made; if missing, open the GE app page once in the console, or ask Google to trigger it).
-- [ ] **T5.2** If Telix uses a *different* project for the GE app than for the connectors, use **that** project's number for `GE_SA`, and ask Google to confirm cross‑project invocation is in scope for the PoC.
+- [ ] **T5.1** The service agent exists: `gcloud iam service-accounts describe "$GE_SA"` (created when the GE app was first made; if missing, open the GE app page once in the console).
+- [ ] **T5.2** If the GE app lives in a *different* project than the connectors, use **that** project's number for `GE_SA` and grant it on each connector service.
+- [ ] **T5.3** Two more managed constraints can block the connector even with T0.1 done — a Telix Org Policy Admin confirms:
+  `constraints/discoveryengine.managed.allowedDataSources` allows `custom_mcp` (or is unset), and
+  `constraints/discoveryengine.managed.allowedEgressFqdns` is unset **or** lists each connector host (e.g. `mcp-clinicaltrials-<n>.europe-west4.run.app`).
+  Also `gcloud services enable connectors.googleapis.com --project=$PROJECT_ID`.
 
 ## 6. Add the connector to the Telix GE app (console, 5 min)
 
 **🔒 TELIX TENANT — performed by a GE admin (Jellen) with you on a call**
 1. Google Cloud console → **Gemini Enterprise** → **Apps** → click the Telix app.
-2. **Connected data stores** → **+ New data store**.
-3. Under **MCP servers** choose **Custom MCP Server**.
-4. **MCP Server URL** = the `https://mcp-clinicaltrials-….run.app/mcp` from step 2.
-   **Authentication** = *Google identity / caller token* (the connector verifies the token; do **not** choose OAuth 2.0 — there is no IdP for public data).
-   Transport must be *Streamable HTTP* (SSE is not supported).
-5. Save. Open the new data store → **Actions** → toggle **ON** the 4 tools (new custom‑MCP actions are off by default; max 100 per server).
-6. Confirm in the data store page that the tool list matches `servers/clinicaltrials/tools.json`.
+2. Left nav **Connected data stores** → **+ New data store** (opens *Select a data source*).
+3. Scroll to the **MCP servers** group → tile **Custom MCP Server**.
+4. Form: **MCP server URL** = `https://mcp-clinicaltrials-<n>.europe-west4.run.app/mcp` (must be the `*.run.app` URL, must end in `/mcp`, Streamable HTTP; SSE is not supported).
+   **Authentication**: choose **No authentication** for the public‑data connectors (Cloud Run IAM + the service‑agent token are what secure it; do **not** configure OAuth 2.0 — there is no IdP for public data).
+   **Data store name**: `clinicaltrials` (keep it short — it becomes the connector name users see).
+5. **Create**. Open the new data store → **Actions** tab → click **Reload custom actions** → toggle **ON** the four tools (new custom‑MCP actions are off by default; max 100 per server).
+6. Compare the tool names with `servers/clinicaltrials/tools.json`.
 - [ ] **T6.1** Screenshot of the data store with actions enabled → PoC folder.
-- [ ] **T6.2** If the *Custom MCP Server* tile is missing or greyed out → T0.1 (org policy) is not lifted or the project lacks `discoveryengine.admin` for the signed‑in admin.
+- [ ] **T6.2** *Custom MCP Server* tile missing/greyed → T0.1 or T5.3 not done, or the signed‑in admin lacks `roles/discoveryengine.admin`.
+- [ ] **T6.3** **Reload custom actions** shows an error → open Chrome DevTools → Network → the `:refreshDataConnectorTools` response `details` block says why: `"Operation denied by org policy"` → T0.1/T5.3; `401/403` → T5.1 invoker grant or non‑`run.app` URL; `Session terminated` → URL missing `/mcp`.
 
 ## 7. Verify from a Telix user account (5 min)
 
@@ -127,6 +134,13 @@ template/deploy.sh clinicaltrials --allow-caller "$GE_SA"     # idempotent; adds
 2. Expect tool calls to `search_trials` and a table with NCT ids (e.g. NCT06520345 — Telix's own TLX591 study).
 3. Agent Designer → new agent → *Tools & Integrations* → authorise the connector → save as **"Radiopharma Evidence Agent"** → share with the R&D group.
 - [ ] **T7.1** Prompt + result screenshot saved; any "permission denied" → go back to step 5.
+
+## 7b. Functional check from your laptop (optional, 1 min)
+```bash
+uv venv && . .venv/bin/activate && uv pip install -r template/proxy/requirements.txt
+PROJECT_ID=$PROJECT_ID REGION=$REGION python tests/cloud_functional.py        # one real tool call per connector
+```
+Expected: `clinicaltrials … total=26`, `pubcrawl … pmid`, `opentargets … ENSG00000086205` (FOLH1/PSMA).
 
 ## 8. Hand‑over record
 
