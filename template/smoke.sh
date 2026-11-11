@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Smoke test a deployed connector with your own identity token: initialize + tools/list.
+# Smoke test a deployed connector (impersonates the mcp-tester SA): initialize + tools/list.
 # Usage: template/smoke.sh <server>   (prints tool names; writes servers/<server>/tools.json)
 set -euo pipefail
 SERVER="${1:?usage: smoke.sh <server-name>}"

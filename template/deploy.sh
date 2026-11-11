@@ -75,7 +75,7 @@ URL="$(gcloud run services describe "${SERVICE}" --region="${REGION}" --format='
 PROJECT_NUMBER="$(gcloud projects describe "${PROJECT_ID}" --format='value(projectNumber)')"
 URL_DET="https://${SERVICE}-${PROJECT_NUMBER}.${REGION}.run.app"
 
-echo "== Pin audience to service URLs (legacy + deterministic)"
+echo "== Record service URLs (AUDIENCE is informational when REQUIRE_AUTH=false)"
 gcloud run services update "${SERVICE}" --region="${REGION}" --update-env-vars="^|^AUDIENCE=${URL},${URL_DET}" --quiet
 
 echo "== Tester service account (used by smoke.sh via impersonation)"
@@ -86,6 +86,17 @@ ME="$(gcloud config get-value account 2>/dev/null)"
 gcloud iam service-accounts add-iam-policy-binding "${TESTER}" --member="user:${ME}" \
   --role=roles/iam.serviceAccountTokenCreator --quiet >/dev/null
 CALLERS+=("${TESTER}")
+
+echo "== Gemini Enterprise caller (Discovery Engine service agent of this project)"
+# Google-managed service agents are not listed by 'iam service-accounts describe'; just grant and check the result.
+GE_SA="service-${PROJECT_NUMBER}@gcp-sa-discoveryengine.iam.gserviceaccount.com"
+if gcloud run services add-iam-policy-binding "${SERVICE}" --region="${REGION}" \
+     --member="serviceAccount:${GE_SA}" --role=roles/run.invoker --quiet >/dev/null 2>&1; then
+  echo "   granted roles/run.invoker to ${GE_SA}"
+else
+  echo "   WARN could not grant ${GE_SA}: it exists only once a Gemini Enterprise app has been created in this project." >&2
+  echo "        If the GE app is in another project, re-run with: --allow-caller service-<THAT_PROJECT_NUMBER>@gcp-sa-discoveryengine.iam.gserviceaccount.com" >&2
+fi
 
 echo "== Invoker grants"
 for c in "${CALLERS[@]}"; do
