@@ -3,7 +3,7 @@
 # Usage: template/smoke.sh <server>   (prints tool names; writes servers/<server>/tools.json)
 set -euo pipefail
 SERVER="${1:?usage: smoke.sh <server-name>}"
-PROJECT_ID="${PROJECT_ID:-eg-telix}"
+PROJECT_ID="${PROJECT_ID:?set PROJECT_ID to the Telix GCP project that hosts the Gemini Enterprise app}"
 REGION="${REGION:-europe-west4}"
 SERVICE="mcp-${SERVER}"
 URL="$(gcloud run services describe "${SERVICE}" --region="${REGION}" --project="${PROJECT_ID}" --format='value(status.url)')"

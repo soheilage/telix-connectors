@@ -7,7 +7,7 @@ This repo gives you one reusable image + three scripts. **Follow the steps in or
 **🔒 TELIX TENANT** need an action or confirmation from a Telix administrator (Jellen Mattens / Vincent Ho) —
 do not improvise around them; raise them in the project channel.
 
-Reference deployment (Google Argolis, project `eg-telix`) is documented in [`docs/reference-deployment.md`](docs/reference-deployment.md).
+The template was run end‑to‑end by Google before hand‑over; expected outputs for each step are listed inline below.
 
 ---
 
@@ -37,6 +37,8 @@ Reference deployment (Google Argolis, project `eg-telix`) is documented in [`doc
   gcloud org-policies describe discoveryengine.managed.disableCustomMcpServerConnector --project=<TELIX_PROJECT_ID> --effective   # expect: enforce: false
   ```
   If `set-policy` says `SERVICE_DISABLED` right after enabling the API, wait a minute and retry.
+
+  > **Caveat — longest‑lead item.** This override needs `roles/orgpolicy.policyAdmin`, which Niveus/NTT will not hold in the Telix organisation. It is a **Telix action (Jellen Mattens / Vincent Ho)** and may need Telix change control. Raise it on day 1, before any build work; nothing in steps 6–7 will work until the effective policy shows `enforce: false`.
 - [ ] **T0.2 Egress.** Outbound HTTPS (443) from Cloud Run in `europe-west4` to `clinicaltrials.gov`, `eutils.ncbi.nlm.nih.gov`, `www.ebi.ac.uk`, `api.platform.opentargets.org` is allowed (Telix confirmed open egress for the PoC on 2026‑10‑2x; re‑confirm if VPC‑SC or Secure Web Proxy was added since).
 - [ ] **T0.3 Scope sign‑off.** Vincent Ho has seen [`docs/infosec-dataflow.md`](docs/infosec-dataflow.md) (what leaves the tenant: query strings only).
 
@@ -144,8 +146,8 @@ Then repeat steps 2–7 for `pubcrawl` and `opentargets`.
 ```
 template/   Dockerfile · proxy/server.py (stdio|remote → Google‑authenticated streamable‑HTTP) · deploy.sh · smoke.sh · register.sh · cloudbuild.yaml
 servers/    clinicaltrials (reference, in‑house) · pubcrawl · opentargets · _template_licensed_{stdio,remote}
-docs/       infosec-dataflow.md · checklist.md · reference-deployment.md · deployments.md
-tests/      e2e_local.sh · local_client.py   (run locally without any cloud: see docs/reference-deployment.md)
+docs/       infosec-dataflow.md · checklist.md · deployments.md
+tests/      e2e_local.sh · local_client.py   (run locally without any cloud; see 'Local test' below)
 ```
 
 ## Troubleshooting
@@ -156,3 +158,11 @@ tests/      e2e_local.sh · local_client.py   (run locally without any cloud: se
 | GE shows no tools after adding | actions toggled off (step 6.5); or server returned >100 tools |
 | Cloud Run cold start > 10 s on first call | expected at min‑instances 0; set `--min-instances=1` for demo days |
 | Upstream errors (429) from NCBI | add `NCBI_API_KEY` secret (PubCrawl) |
+
+## Local test (no cloud account needed)
+```bash
+uv venv && . .venv/bin/activate && uv pip install -r template/proxy/requirements.txt "mcp>=1.10"
+bash tests/e2e_local.sh
+```
+Expected: `4 tools …`, `search_trials("177Lu PSMA", country=Australia) → total=26` (incl. NCT06520345, 177Lu‑TLX591),
+then `auth: no-token → 401`, `bad-token → 401`.

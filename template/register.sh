@@ -3,7 +3,7 @@
 # Usage: template/register.sh <server>
 set -euo pipefail
 SERVER="${1:?usage: register.sh <server-name>}"
-PROJECT_ID="${PROJECT_ID:-eg-telix}"
+PROJECT_ID="${PROJECT_ID:?set PROJECT_ID to the Telix GCP project that hosts the Gemini Enterprise app}"
 REGION="${REGION:-europe-west4}"
 REGISTRY_LOCATION="${REGISTRY_LOCATION:-eu}"     # registry metadata residency (eu|global|region)
 SERVICE="mcp-${SERVER}"

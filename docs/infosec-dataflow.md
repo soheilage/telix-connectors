@@ -7,7 +7,7 @@
 - No Telix documents, SharePoint content, email or identities are sent to these services. The connectors have no access to any Telix data store.
 
 **Where the connectors run**
-- Cloud Run, `europe-west4`, inside project `eg-telix` (Telix organisation). No public invocation: IAM‑enforced, plus application‑level verification of a Google‑signed identity token whose audience is the service URL.
+- Cloud Run, `europe-west4`, inside Telix's own Google Cloud project (Telix organisation). No public invocation: IAM‑enforced, plus application‑level verification of a Google‑signed identity token whose audience is the service URL.
 - Each connector runs under its own service account with no project permissions; licensed‑source credentials (when added) live in Secret Manager and are mounted at runtime only.
 
 **What the tools can do**

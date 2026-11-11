@@ -4,7 +4,7 @@
 set -euo pipefail
 
 SERVER="${1:?usage: deploy.sh <server-name> [--allow-caller SA]...}"; shift || true
-PROJECT_ID="${PROJECT_ID:-eg-telix}"
+PROJECT_ID="${PROJECT_ID:?set PROJECT_ID to the Telix GCP project that hosts the Gemini Enterprise app}"
 REGION="${REGION:-europe-west4}"
 REPO="${REPO:-mcp-connectors}"
 SERVICE="mcp-${SERVER}"
