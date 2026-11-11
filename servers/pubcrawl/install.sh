@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# PubCrawl (MIT) - PubMed / Europe PMC / drug labels / trial search.
-# TODO(phase 2): pin to a commit SHA or npm version after review. Source: https://github.com/nickjlamb/pubcrawl
+# PubCrawl (MIT) - PubMed / Europe PMC / drug labels / trial search. https://github.com/nickjlamb/pubcrawl
+# Pinned: npm @pharmatools/pubcrawl 2.8.0  (git fb8da65, reviewed 2026-11-10; all tools read-only)
 set -euo pipefail
-PUBCRAWL_REF="${PUBCRAWL_REF:-main}"   # replace with a SHA, e.g. 1a2b3c4
-npm install -g "github:nickjlamb/pubcrawl#${PUBCRAWL_REF}"
+PUBCRAWL_VERSION="${PUBCRAWL_VERSION:-2.8.0}"
+npm install -g --no-audit --no-fund "@pharmatools/pubcrawl@${PUBCRAWL_VERSION}"
+command -v pubcrawl

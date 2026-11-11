@@ -50,6 +50,9 @@ if [[ -f "${SRV_DIR}/secrets.txt" ]]; then
   # format per line: ENV_VAR=secret-name   (secret must already exist in Secret Manager)
   while IFS='=' read -r var secret; do
     [[ -z "${var}" || "${var}" =~ ^# ]] && continue
+    if ! gcloud secrets describe "${secret}" >/dev/null 2>&1; then
+      echo "   WARN secret '${secret}' not found in ${PROJECT_ID}; deploying without ${var}" >&2; continue
+    fi
     gcloud secrets add-iam-policy-binding "${secret}" --member="serviceAccount:${SA_EMAIL}" \
       --role=roles/secretmanager.secretAccessor --quiet >/dev/null
     SECRET_FLAGS+=("--set-secrets=${var}=${secret}:latest")
