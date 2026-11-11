@@ -178,6 +178,13 @@ Checks
    Expect a call to `search_trials` and NCT ids in the answer (e.g. NCT06520345, Telix's 177Lu‑TLX591 study).
 3. Two more prompts, one per connector: *"Compare the US and UK labels for Illuccix"* (pubcrawl) and
    *"Summarise target–disease evidence and tractability for CA9 in renal cell carcinoma"* (opentargets).
+Expected results (from Google's rehearsal — the same prompts should produce equivalent answers in Telix's tenant):
+
+| clinicaltrials | pubcrawl | opentargets |
+|---|---|---|
+| ![](docs/images/ge-chat-clinicaltrials.jpg) | ![](docs/images/ge-chat-pubcrawl.jpg) | ![](docs/images/ge-chat-opentargets.jpg) |
+| Table of recruiting Ph2/3 ¹⁷⁷Lu‑PSMA trials in AU incl. NCT06520345 (Telix) | US vs UK label comparison, dose/imaging/contraindications | CA9 association scores (ENSG00000107159), tractability by modality |
+
 - [ ] **T6.1** Screenshots of the three answers → PoC folder.
 
 ## 7. Hand‑over record
