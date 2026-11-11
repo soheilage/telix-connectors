@@ -22,9 +22,21 @@ Reference deployment (Google Argolis, project `eg-telix`) is documented in [`doc
 | Tools on your laptop | `gcloud` (≥ 540), `git`, `curl`, `python3` | `gcloud version` |
 
 **🔒 TELIX TENANT — confirm before step 1**
-- [ ] **T0.1 Org policy.** GE blocks custom MCP connectors by default via the managed constraint
-  `discoveryengine.managed.disableCustomMcpServerConnector`. A Telix **Organization Policy Administrator** must set it to *not enforced* for `<TELIX_PROJECT_ID>` (project‑level override is enough).
-  Check: `gcloud resource-manager org-policies describe discoveryengine.managed.disableCustomMcpServerConnector --project=<TELIX_PROJECT_ID> --effective`
+- [ ] **T0.1 Org policy (blocking).** GE blocks custom MCP connectors by default via the managed constraint
+  `discoveryengine.managed.disableCustomMcpServerConnector` — it was **enforced** in our reference project too.
+  A Telix **Organization Policy Administrator** (`roles/orgpolicy.policyAdmin`) sets a project‑level override:
+  ```bash
+  gcloud services enable orgpolicy.googleapis.com --project=<TELIX_PROJECT_ID>      # wait ~1 min after enabling
+  cat > /tmp/ge_mcp_policy.yaml <<EOF
+  name: projects/<TELIX_PROJECT_ID>/policies/discoveryengine.managed.disableCustomMcpServerConnector
+  spec:
+    rules:
+    - enforce: false
+  EOF
+  gcloud org-policies set-policy /tmp/ge_mcp_policy.yaml --project=<TELIX_PROJECT_ID> --billing-project=<TELIX_PROJECT_ID>
+  gcloud org-policies describe discoveryengine.managed.disableCustomMcpServerConnector --project=<TELIX_PROJECT_ID> --effective   # expect: enforce: false
+  ```
+  If `set-policy` says `SERVICE_DISABLED` right after enabling the API, wait a minute and retry.
 - [ ] **T0.2 Egress.** Outbound HTTPS (443) from Cloud Run in `europe-west4` to `clinicaltrials.gov`, `eutils.ncbi.nlm.nih.gov`, `www.ebi.ac.uk`, `api.platform.opentargets.org` is allowed (Telix confirmed open egress for the PoC on 2026‑10‑2x; re‑confirm if VPC‑SC or Secure Web Proxy was added since).
 - [ ] **T0.3 Scope sign‑off.** Vincent Ho has seen [`docs/infosec-dataflow.md`](docs/infosec-dataflow.md) (what leaves the tenant: query strings only).
 
@@ -63,10 +75,11 @@ template/deploy.sh pubcrawl
 ```bash
 template/smoke.sh clinicaltrials
 ```
-Expected: `health ok`, `serverInfo`, `4 tools: search_trials, get_trial, trial_locations, trials_by_sponsor`,
-and `servers/clinicaltrials/tools.json` written. If you get `401`, your account lacks `roles/run.invoker`
-on the service — grant it to yourself for testing: 
-`gcloud run services add-iam-policy-binding mcp-clinicaltrials --region=$REGION --member=user:you@… --role=roles/run.invoker`.
+`smoke.sh` impersonates the `mcp-tester` service account created by `deploy.sh` (user accounts cannot mint
+audience‑bound identity tokens). Expected: `serverInfo {'name': 'clinicaltrials', …}`,
+`4 tools: search_trials, get_trial, trial_locations, trials_by_sponsor`, and `servers/clinicaltrials/tools.json` written.
+`/healthz` may report 404 through the Cloud Run front end — ignore; the MCP endpoint is what matters.
+If `initialize` returns `401`: `AUDIENCE` env ≠ URL (re‑run `deploy.sh`) or the tester SA lacks `roles/run.invoker`.
 
 ## 4. Register in Agent Registry (1 min)
 
@@ -74,7 +87,8 @@ on the service — grant it to yourself for testing:
 template/register.sh clinicaltrials
 gcloud agent-registry mcp-servers list --project=$PROJECT_ID --location=eu
 ```
-Registration is metadata only (discovery/governance); it does not grant access.
+Registration is metadata only (discovery/governance); it does not grant access. The script strips fastmcp's
+`_meta` from the tool spec (Agent Registry rejects it) and registers with `protocolBinding=jsonrpc`.
 
 ## 5. Grant Gemini Enterprise permission to call the connector
 

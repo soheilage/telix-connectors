@@ -15,7 +15,7 @@ ARGS=(agent-registry services create "${SERVICE}"
   --project="${PROJECT_ID}" --location="${REGISTRY_LOCATION}"
   --display-name="Telix ${SERVER} MCP"
   --description="${DESC:-Public-data MCP connector (${SERVER}) for Telix Gemini Enterprise PoC. Read-only.}"
-  --interfaces="url=${URL}/mcp,protocolBinding=mcp-streamable-http")
+  --interfaces="url=${URL}/mcp,protocolBinding=jsonrpc")
 
 if [[ -f "${TOOLS_FILE}" ]]; then
   ARGS+=(--mcp-server-spec-type=tool-spec --mcp-server-spec-content="$(cat "${TOOLS_FILE}")")
