@@ -11,4 +11,5 @@ Tick per connector. The three public connectors are pre‑reviewed and pinned; t
 - [ ] `template/register.sh <name>` → listed by `gcloud agent-registry mcp-servers list --location=eu`
 - [ ] 🔒 GE app: Custom MCP Server data store added with the real `…run.app/mcp` URL; **Reload custom actions** OK; **Enable actions** → all tools
 - [ ] 🔒 GE web app: connector visible under **Custom MCP** in the connector picker; test prompt answered with a tool call
+- [ ] Screenshots committed: `docs/evidence/<name>-actions.png`, `docs/evidence/<name>-chat.png`
 - [ ] Row added to `docs/deployments.md`

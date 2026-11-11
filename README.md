@@ -91,7 +91,7 @@ DONE  mcp-clinicaltrials
 **Record the three URLs** (also: `gcloud run services describe mcp-<name> --region=$REGION --format='value(status.url)'` + `/mcp`).
 
 Notes
-- If `deploy.sh` prints `WARN service-…@gcp-sa-discoveryengine… not found`, the GE app is in another project →
+- If `deploy.sh` prints `WARN could not grant service-…@gcp-sa-discoveryengine…`, the GE app is in another project →
   re‑run with `--allow-caller service-<GE_PROJECT_NUMBER>@gcp-sa-discoveryengine.iam.gserviceaccount.com`.
 - PubCrawl works without a key; to lift PubMed's rate limit (3 → 10 req/s) create the secret **before** deploying:
   `gcloud secrets create ncbi-api-key --replication-policy=automatic && printf '%s' "<KEY>" | gcloud secrets versions add ncbi-api-key --data-file=-`
@@ -154,7 +154,7 @@ Registration is governance metadata (discovery, policy); it does not grant acces
 
 Checks
 - [ ] **T5.1** Tool names match `servers/<name>/tools.json` (4 / 14 / 5).
-- [ ] **T5.2** Screenshot of each data store with actions enabled → PoC folder.
+- [ ] **T5.2** Save a screenshot of each data store's **Actions** page (tools enabled) as `docs/evidence/<name>-actions.png`.
 - [ ] **T5.3** If the *Custom MCP Server* tile is missing or greyed → T0.1 not effective, or the admin lacks `roles/discoveryengine.admin`.
 - [ ] **T5.4** If **Reload custom actions** fails, the error text tells you why:
 
@@ -162,7 +162,7 @@ Checks
   |---|---|---|
   | `Operation denied by org policy` | T0.1 / allowedDataSources / allowedEgressFqdns | Telix Org Policy Admin |
   | `HTTP 400 … Error 400 (Bad Request)` and host like `mcp-…-%3Cn%3E…` | a placeholder was pasted | paste the real URL |
-  | `HTTP 404 … Not Found` | URL without `/mcp` (older builds) | edit URL, add `/mcp` |
+  | `HTTP 404 … Not Found` | URL without `/mcp` | edit the URL, add `/mcp` |
   | `HTTP 401` / `HTTP 403` | service agent lacks `roles/run.invoker`, or URL is not `*.run.app` | re‑run `deploy.sh <name>` (grants it) |
   | `Session terminated` / connection lost | service cold start or crash | retry; check Cloud Run logs for `mcp-<name>` |
 
@@ -191,12 +191,13 @@ Expected results (from Google's rehearsal — the same prompts should produce eq
 > Name the product, market and document explicitly (e.g. *"Compare the FDA USPI for Illuccix with the MHRA SmPC for Illuccix"*),
 > and check the returned identifiers (PMID, NCT, SmPC source) that the connectors surface before relying on an answer.
 
-- [ ] **T6.1** Screenshots of the three answers → PoC folder.
+- [ ] **T6.1** Save a screenshot of each answer as `docs/evidence/<name>-chat.png`.
 
 ## 7. Hand‑over record
 
-Add one row per connector to [`docs/deployments.md`](docs/deployments.md) (URL, image tag, who verified in GE) and tick
-[`docs/checklist.md`](docs/checklist.md). That is the deliverable.
+Add one row per connector to [`docs/deployments.md`](docs/deployments.md) (URL, image tag, Agent Registry id, who added it
+in GE, who verified it in chat), commit the `docs/evidence/*.png` screenshots from T5.2/T6.1, and tick
+[`docs/checklist.md`](docs/checklist.md). Push to your fork/branch and share the link — that is the deliverable.
 
 ---
 
@@ -223,7 +224,7 @@ install and environment.
 ```
 template/   Dockerfile · cloudbuild.yaml · proxy/server.py · deploy.sh · smoke.sh · register.sh
 servers/    clinicaltrials (in‑house) · pubcrawl · opentargets · _template_licensed_stdio · _template_licensed_remote
-docs/       infosec-dataflow.md · checklist.md · deployments.md · images/
+docs/       infosec-dataflow.md · checklist.md · deployments.md · images/ (expected results) · evidence/ (your screenshots)
 tests/      e2e_local.sh (no cloud needed) · local_client.py · cloud_functional.py
 SOURCES.md  upstream repo, licence, pinned version, endpoints, credentials per connector
 ```
