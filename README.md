@@ -185,6 +185,12 @@ Expected results (from Google's rehearsal — the same prompts should produce eq
 | ![](docs/images/ge-chat-clinicaltrials.jpg) | ![](docs/images/ge-chat-pubcrawl.jpg) | ![](docs/images/ge-chat-opentargets.jpg) |
 | Table of recruiting Ph2/3 ¹⁷⁷Lu‑PSMA trials in AU incl. NCT06520345 (Telix) | US vs UK label comparison, dose/imaging/contraindications | CA9 association scores (ENSG00000107159), tractability by modality |
 
+> **Note for researchers — prompt precision.** In the rehearsal, *"Compare the US and UK labels for Illuccix"* returned the US
+> Illuccix label against **Locametz** as the UK/EU comparator. Illuccix also holds UK/EU authorisations; the model chose a
+> comparator because the prompt did not pin product and jurisdiction. This is model interpretation, not a connector fault.
+> Name the product, market and document explicitly (e.g. *"Compare the FDA USPI for Illuccix with the MHRA SmPC for Illuccix"*),
+> and check the returned identifiers (PMID, NCT, SmPC source) that the connectors surface before relying on an answer.
+
 - [ ] **T6.1** Screenshots of the three answers → PoC folder.
 
 ## 7. Hand‑over record
