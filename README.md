@@ -1,63 +1,144 @@
-# telix-connectors
+# telix-connectors — Partner Runbook (Niveus / NTT)
 
-Deployment template for exposing **MCP servers to Gemini Enterprise** (Telix PoC).
-One generic image wraps any upstream MCP server (stdio or remote HTTP) as a private,
-Google‑authenticated **streamable‑HTTP** endpoint on **Cloud Run (europe-west4)**,
-then registers it in **Agent Registry** and adds it to GE as a *Custom MCP Server*.
+Purpose: expose public‑data MCP servers (ClinicalTrials.gov, PubMed/PubCrawl, Open Targets — later PatSnap,
+Article Galaxy) to **Telix's Gemini Enterprise (GE)** tenant, in the EU, with no production Telix data in scope.
 
-```
-template/            # reusable: Dockerfile, proxy, deploy/register/smoke scripts
-servers/<name>/      # per‑server: install.sh (pinned upstream), server.env, [secrets.txt]
-  clinicaltrials/    # in‑house FastMCP server over ClinicalTrials.gov API v2 (reference impl.)
-  pubcrawl/          # PubMed / Europe PMC / drug labels (MIT)                [phase 2: pin SHA]
-  opentargets/       # Open Targets Platform (Apache‑2.0)                    [phase 2: pin SHA]
-  _template_licensed_remote/   # vendor‑hosted HTTP MCP + token (e.g. Article Galaxy)
-  _template_licensed_stdio/    # self‑hosted stdio MCP + creds (e.g. PatSnap)
-docs/                # InfoSec data‑flow note, checklist
-```
+This repo gives you one reusable image + three scripts. **Follow the steps in order.** Steps marked
+**🔒 TELIX TENANT** need an action or confirmation from a Telix administrator (Jellen Mattens / Vincent Ho) —
+do not improvise around them; raise them in the project channel.
 
-## Defaults
-| Setting | Value |
-|---|---|
-| Project | `eg-telix` (override `PROJECT_ID`) |
-| Region | `europe-west4`; registry location `eu` |
-| Ingress | Cloud Run `--no-allow-unauthenticated`; app also verifies Google ID token (`AUDIENCE` = service URL) |
-| Identity | one service account per connector, no project roles |
-| Secrets | Secret Manager only (`servers/<name>/secrets.txt` → `--set-secrets`) |
-| Tools | read‑only (`readOnlyHint`) |
+Reference deployment (Google Argolis, project `eg-telix`) is documented in [`docs/reference-deployment.md`](docs/reference-deployment.md).
 
-## Runbook (per connector)
+---
+
+## 0. Before you start
+
+| Item | Value for Telix | How to confirm |
+|---|---|---|
+| GCP project hosting the GE app | `<TELIX_PROJECT_ID>` | Console → Gemini Enterprise → Apps → note project |
+| Region for connectors | `europe-west4` | agreed (EU data residency) |
+| GE app location | `eu` multi‑region | Gemini Enterprise → Apps → app details |
+| Your role on the project | `roles/run.admin`, `roles/cloudbuild.builds.editor`, `roles/artifactregistry.admin`, `roles/iam.serviceAccountAdmin`, `roles/secretmanager.admin`, `roles/agentregistry.editor`, `roles/discoveryengine.admin` | `gcloud projects get-iam-policy <TELIX_PROJECT_ID> --flatten=bindings[].members --filter=bindings.members:you@…` |
+| Tools on your laptop | `gcloud` (≥ 540), `git`, `curl`, `python3` | `gcloud version` |
+
+**🔒 TELIX TENANT — confirm before step 1**
+- [ ] **T0.1 Org policy.** GE blocks custom MCP connectors by default via the managed constraint
+  `discoveryengine.managed.disableCustomMcpServerConnector`. A Telix **Organization Policy Administrator** must set it to *not enforced* for `<TELIX_PROJECT_ID>` (project‑level override is enough).
+  Check: `gcloud resource-manager org-policies describe discoveryengine.managed.disableCustomMcpServerConnector --project=<TELIX_PROJECT_ID> --effective`
+- [ ] **T0.2 Egress.** Outbound HTTPS (443) from Cloud Run in `europe-west4` to `clinicaltrials.gov`, `eutils.ncbi.nlm.nih.gov`, `www.ebi.ac.uk`, `api.platform.opentargets.org` is allowed (Telix confirmed open egress for the PoC on 2026‑10‑2x; re‑confirm if VPC‑SC or Secure Web Proxy was added since).
+- [ ] **T0.3 Scope sign‑off.** Vincent Ho has seen [`docs/infosec-dataflow.md`](docs/infosec-dataflow.md) (what leaves the tenant: query strings only).
+
+---
+
+## 1. Clone and configure (5 min)
+
 ```bash
-# 0. prerequisites: gcloud auth login; gcloud config set project eg-telix; git clone <repo>; cd telix-connectors
-# 1. (licensed sources only) create secrets first
-gcloud secrets create ncbi-api-key --replication-policy=automatic && printf '%s' "$KEY" | gcloud secrets versions add ncbi-api-key --data-file=-
-# 2. build + deploy (creates AR repo, SA, Cloud Run service; pins AUDIENCE)
-template/deploy.sh clinicaltrials --allow-caller <GE-service-agent-or-agent-SA>
-# 3. smoke test with your identity; writes servers/<name>/tools.json
+git clone https://github.com/soheilage/telix-connectors.git && cd telix-connectors
+gcloud auth login            # your Telix‑project identity
+export PROJECT_ID=<TELIX_PROJECT_ID> REGION=europe-west4 REGISTRY_LOCATION=eu
+gcloud config set project $PROJECT_ID
+```
+
+## 2. Deploy a connector (10–15 min each)
+
+Start with `clinicaltrials` (no credentials, in‑house code — fastest to get a green light).
+
+```bash
+template/deploy.sh clinicaltrials
+```
+What it does: enables APIs → creates Artifact Registry repo `mcp-connectors` → creates service account
+`mcp-clinicaltrials@…` (no project roles) → Cloud Build → Cloud Run `mcp-clinicaltrials`
+(private, EU, 0–3 instances) → pins `AUDIENCE` to the service URL. It prints the `…/mcp` URL — **record it**.
+
+For PubCrawl / Open Targets first pin the upstream commit in `servers/<name>/install.sh` (see `SOURCES.md`),
+and for PubCrawl create the optional secret:
+```bash
+gcloud secrets create ncbi-api-key --replication-policy=automatic
+printf '%s' "<KEY>" | gcloud secrets versions add ncbi-api-key --data-file=-
+template/deploy.sh pubcrawl
+```
+
+## 3. Smoke test with your own identity (2 min)
+
+```bash
 template/smoke.sh clinicaltrials
-# 4. register in Agent Registry (uses tools.json if present)
-template/register.sh clinicaltrials
-# 5. Gemini Enterprise: admin → tools / custom MCP server → URL = <service>/mcp, auth = Google caller token.
-#    Grant roles/run.invoker on the service to the identity GE uses (re‑run deploy.sh with --allow-caller).
-# 6. Antigravity (optional): add to mcp.json as remote server; use `gcloud auth print-identity-token --audiences=<URL>`.
 ```
+Expected: `health ok`, `serverInfo`, `4 tools: search_trials, get_trial, trial_locations, trials_by_sponsor`,
+and `servers/clinicaltrials/tools.json` written. If you get `401`, your account lacks `roles/run.invoker`
+on the service — grant it to yourself for testing: 
+`gcloud run services add-iam-policy-binding mcp-clinicaltrials --region=$REGION --member=user:you@… --role=roles/run.invoker`.
 
-## Adding a new connector
-1. `cp -r servers/_template_licensed_stdio servers/<name>` (or `_licensed_remote`).
-2. Edit `install.sh` (pin a commit SHA), `server.env` (`UPSTREAM_CMD` **or** `UPSTREAM_URL`), `secrets.txt`.
-3. Add the upstream to `SOURCES.md` (licence, URL, SHA, data it reaches).
-4. Run steps 2–5 above.
+## 4. Register in Agent Registry (1 min)
 
-## Local test (no cloud)
 ```bash
-uv venv && . .venv/bin/activate && uv pip install -r template/proxy/requirements.txt mcp
-REQUIRE_AUTH=false UPSTREAM_CMD="python servers/clinicaltrials/ctgov_mcp.py" python template/proxy/server.py
-# other terminal:
-python tests/local_client.py http://localhost:8080/mcp
+template/register.sh clinicaltrials
+gcloud agent-registry mcp-servers list --project=$PROJECT_ID --location=eu
+```
+Registration is metadata only (discovery/governance); it does not grant access.
+
+## 5. Grant Gemini Enterprise permission to call the connector
+
+GE invokes the Cloud Run URL with a Google‑signed identity token from the **Discovery Engine service agent** of the GE project.
+
+```bash
+PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
+GE_SA="service-${PROJECT_NUMBER}@gcp-sa-discoveryengine.iam.gserviceaccount.com"
+template/deploy.sh clinicaltrials --allow-caller "$GE_SA"     # idempotent; adds roles/run.invoker
 ```
 
-## Modes
-- **A – stdio upstream** (`UPSTREAM_CMD`): proxy spawns the server as a subprocess, maintains MCP sessions over HTTP.
-- **B – remote upstream** (`UPSTREAM_URL` + `UPSTREAM_TOKEN`/`UPSTREAM_HEADERS`): proxy forwards; useful when the vendor is already streamable‑HTTP but uses API keys / 2LO that GE cannot speak natively.
+**🔒 TELIX TENANT — confirm**
+- [ ] **T5.1** The service agent exists: `gcloud iam service-accounts describe "$GE_SA"` (it is created when the GE app was first made; if missing, open the GE app page once in the console, or ask Google to trigger it).
+- [ ] **T5.2** If Telix uses a *different* project for the GE app than for the connectors, use **that** project's number for `GE_SA`, and ask Google to confirm cross‑project invocation is in scope for the PoC.
 
-See `docs/infosec-dataflow.md` for what leaves the tenant (query strings to public APIs only).
+## 6. Add the connector to the Telix GE app (console, 5 min)
+
+**🔒 TELIX TENANT — performed by a GE admin (Jellen) with you on a call**
+1. Google Cloud console → **Gemini Enterprise** → **Apps** → click the Telix app.
+2. **Connected data stores** → **+ New data store**.
+3. Under **MCP servers** choose **Custom MCP Server**.
+4. **MCP Server URL** = the `https://mcp-clinicaltrials-….run.app/mcp` from step 2.
+   **Authentication** = *Google identity / caller token* (the connector verifies the token; do **not** choose OAuth 2.0 — there is no IdP for public data).
+   Transport must be *Streamable HTTP* (SSE is not supported).
+5. Save. Open the new data store → **Actions** → toggle **ON** the 4 tools (new custom‑MCP actions are off by default; max 100 per server).
+6. Confirm in the data store page that the tool list matches `servers/clinicaltrials/tools.json`.
+- [ ] **T6.1** Screenshot of the data store with actions enabled → PoC folder.
+- [ ] **T6.2** If the *Custom MCP Server* tile is missing or greyed out → T0.1 (org policy) is not lifted or the project lacks `discoveryengine.admin` for the signed‑in admin.
+
+## 7. Verify from a Telix user account (5 min)
+
+**🔒 TELIX TENANT — a Telix researcher (David Han / Iva Kulic) runs this in the GE web app**
+1. New chat → prompt: *"Using the ClinicalTrials connector, list recruiting phase 2/3 trials of 177Lu‑PSMA in Australia and summarise sponsors."*
+2. Expect tool calls to `search_trials` and a table with NCT ids (e.g. NCT06520345 — Telix's own TLX591 study).
+3. Agent Designer → new agent → *Tools & Integrations* → authorise the connector → save as **"Radiopharma Evidence Agent"** → share with the R&D group.
+- [ ] **T7.1** Prompt + result screenshot saved; any "permission denied" → go back to step 5.
+
+## 8. Hand‑over record
+
+Append a row to [`docs/deployments.md`](docs/deployments.md): connector, URL, image SHA, date, who verified in GE.
+Then repeat steps 2–7 for `pubcrawl` and `opentargets`.
+
+---
+
+## Adding a licensed source later (PatSnap, Article Galaxy)
+1. Copy `servers/_template_licensed_stdio` (self‑hosted, e.g. PatSnap) or `servers/_template_licensed_remote`
+   (vendor‑hosted HTTP, e.g. Article Galaxy) to `servers/<name>`.
+2. Put credentials in Secret Manager; list them in `servers/<name>/secrets.txt` (`ENV=secret-name`).
+3. **🔒 TELIX TENANT** — David Han confirms with the vendor that API/MCP access is permitted under Telix's licence; Vincent confirms the credential is scoped read‑only.
+4. Steps 2–8 above.
+
+## Layout
+```
+template/   Dockerfile · proxy/server.py (stdio|remote → Google‑authenticated streamable‑HTTP) · deploy.sh · smoke.sh · register.sh · cloudbuild.yaml
+servers/    clinicaltrials (reference, in‑house) · pubcrawl · opentargets · _template_licensed_{stdio,remote}
+docs/       infosec-dataflow.md · checklist.md · reference-deployment.md · deployments.md
+tests/      e2e_local.sh · local_client.py   (run locally without any cloud: see docs/reference-deployment.md)
+```
+
+## Troubleshooting
+| Symptom | Cause / fix |
+|---|---|
+| `smoke.sh` → 401 | caller lacks `roles/run.invoker`, or `AUDIENCE` env ≠ service URL (re‑run `deploy.sh`) |
+| 403 | `ALLOWED_PRINCIPALS` set and caller not listed |
+| GE shows no tools after adding | actions toggled off (step 6.5); or server returned >100 tools |
+| Cloud Run cold start > 10 s on first call | expected at min‑instances 0; set `--min-instances=1` for demo days |
+| Upstream errors (429) from NCBI | add `NCBI_API_KEY` secret (PubCrawl) |

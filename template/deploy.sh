@@ -67,9 +67,20 @@ gcloud run deploy "${SERVICE}" \
   "${SECRET_FLAGS[@]}" --quiet
 
 URL="$(gcloud run services describe "${SERVICE}" --region="${REGION}" --format='value(status.url)')"
+PROJECT_NUMBER="$(gcloud projects describe "${PROJECT_ID}" --format='value(projectNumber)')"
+URL_DET="https://${SERVICE}-${PROJECT_NUMBER}.${REGION}.run.app"
 
-echo "== Pin audience to service URL"
-gcloud run services update "${SERVICE}" --region="${REGION}" --update-env-vars="AUDIENCE=${URL}" --quiet
+echo "== Pin audience to service URLs (legacy + deterministic)"
+gcloud run services update "${SERVICE}" --region="${REGION}" --update-env-vars="^|^AUDIENCE=${URL},${URL_DET}" --quiet
+
+echo "== Tester service account (used by smoke.sh via impersonation)"
+TESTER="mcp-tester@${PROJECT_ID}.iam.gserviceaccount.com"
+gcloud iam service-accounts describe "${TESTER}" >/dev/null 2>&1 || \
+  gcloud iam service-accounts create mcp-tester --display-name="MCP connector smoke tester" --quiet
+ME="$(gcloud config get-value account 2>/dev/null)"
+gcloud iam service-accounts add-iam-policy-binding "${TESTER}" --member="user:${ME}" \
+  --role=roles/iam.serviceAccountTokenCreator --quiet >/dev/null
+CALLERS+=("${TESTER}")
 
 echo "== Invoker grants"
 for c in "${CALLERS[@]}"; do

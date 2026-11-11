@@ -37,7 +37,8 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message
 log = logging.getLogger("mcp-connector")
 
 SERVER_NAME = os.environ.get("SERVER_NAME", "mcp-connector")
-AUDIENCE = os.environ.get("AUDIENCE")
+# Comma-separated list; Cloud Run exposes two URL forms (deterministic + legacy), accept both.
+AUDIENCES = [a.strip() for a in os.environ.get("AUDIENCE", "").split(",") if a.strip()]
 REQUIRE_AUTH = os.environ.get("REQUIRE_AUTH", "true").lower() == "true"
 ALLOWED = {p.strip() for p in os.environ.get("ALLOWED_PRINCIPALS", "").split(",") if p.strip()}
 _PUBLIC_PATHS = {"/healthz"}
@@ -53,9 +54,10 @@ class GoogleIdTokenAuth(BaseHTTPMiddleware):
         if not auth.lower().startswith("bearer "):
             return JSONResponse({"error": "missing bearer token"}, status_code=401)
         try:
-            claims = id_token.verify_oauth2_token(
-                auth.split(" ", 1)[1], google_requests.Request(), audience=AUDIENCE
-            )
+            claims = id_token.verify_oauth2_token(auth.split(" ", 1)[1], google_requests.Request())
+            aud = claims.get("aud")
+            if AUDIENCES and aud not in AUDIENCES:
+                raise ValueError(f"audience {aud!r} not in {AUDIENCES}")
         except Exception as exc:  # noqa: BLE001
             log.warning("token rejected: %s", exc)
             return JSONResponse({"error": "invalid token"}, status_code=401)

@@ -7,7 +7,8 @@ PROJECT_ID="${PROJECT_ID:-eg-telix}"
 REGION="${REGION:-europe-west4}"
 SERVICE="mcp-${SERVER}"
 URL="$(gcloud run services describe "${SERVICE}" --region="${REGION}" --project="${PROJECT_ID}" --format='value(status.url)')"
-TOKEN="$(gcloud auth print-identity-token --audiences="${URL}")"
+TESTER="${TESTER:-mcp-tester@${PROJECT_ID}.iam.gserviceaccount.com}"   # created by deploy.sh
+TOKEN="$(gcloud auth print-identity-token --impersonate-service-account="${TESTER}" --audiences="${URL}" --include-email 2>/dev/null)"
 H=(-H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream")
 
 echo "== health";  curl -fsS "${URL}/healthz"; echo
