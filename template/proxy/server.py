@@ -1,9 +1,10 @@
 """Generic MCP connector wrapper for Gemini Enterprise.
 
 Exposes an upstream MCP server (stdio *or* remote streamable-HTTP) as a
-Google-authenticated streamable-HTTP endpoint at /mcp, suitable for
-registration as a Gemini Enterprise "Custom MCP Server" (auth: Google caller
-token) and for Agent Registry.
+streamable-HTTP endpoint at /mcp (and /), for use as a Gemini Enterprise
+"Custom MCP Server" and for Agent Registry. On Cloud Run the service is private
+and Cloud Run IAM authenticates callers; the optional in-app token check
+(REQUIRE_AUTH=true) is for hosting outside Cloud Run.
 
 Configuration (env):
   SERVER_NAME         Display name (default: mcp-connector)
@@ -11,7 +12,7 @@ Configuration (env):
   UPSTREAM_URL        remote upstream, e.g. https://api.x.com/mcp   (mode B)
   UPSTREAM_TOKEN      bearer token for mode B (from Secret Manager)
   UPSTREAM_HEADERS    JSON object of extra headers for mode B
-  AUDIENCE            Expected ID-token audience (the Cloud Run service URL)
+  AUDIENCE            Comma-separated accepted ID-token audiences (only used when REQUIRE_AUTH=true)
   ALLOWED_PRINCIPALS  Comma-separated SA emails allowed to call (optional)
   REQUIRE_AUTH        "true" (default) verifies a Google ID token in Authorization.
                       Set "false" on Cloud Run with --no-allow-unauthenticated: Cloud Run IAM

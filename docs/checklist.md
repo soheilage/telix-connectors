@@ -1,13 +1,14 @@
 # Connector hand‑over checklist (Niveus / NTT)
 
-- [ ] Upstream reviewed; tools confirmed read‑only; commit SHA pinned in `servers/<name>/install.sh`
-- [ ] `SOURCES.md` row added (licence, endpoints, credentials)
-- [ ] Secrets created in Secret Manager (`servers/<name>/secrets.txt` names match)
-- [ ] `template/deploy.sh <name>` succeeded; URL recorded
-- [ ] `template/smoke.sh <name>` lists tools; `tools.json` committed
-- [ ] `template/register.sh <name>` → visible in `gcloud agent-registry mcp-servers list --location=eu`
-- [ ] GE: Custom MCP Server data store added with the real `…run.app/mcp` URL; **Reload custom actions** OK; **Enable actions** → all tools enabled
-- [ ] GE web app: connector visible under **Custom MCP** in the connector picker
-- [ ] Test prompt executed in GE by a Telix user; screenshot saved to PoC folder
-- [ ] Antigravity `mcp.json` updated in workshop repo (optional)
-- [ ] `docs/infosec-dataflow.md` updated if endpoints changed; shared with Vincent Ho
+Tick per connector. The three public connectors are pre‑reviewed and pinned; the first three boxes only apply to new sources.
+
+- [ ] (new source only) upstream reviewed, all tools read‑only, version pinned in `servers/<name>/install.sh`
+- [ ] (new source only) `SOURCES.md` row added; `docs/infosec-dataflow.md` endpoint table updated and shared with Vincent Ho
+- [ ] (new source only) secrets created in Secret Manager; names match `servers/<name>/secrets.txt`
+- [ ] 🔒 T0.1 org policy effective `enforce: false` (Telix Org Policy Admin)
+- [ ] `template/deploy.sh <name>` finished with `DONE`; URL recorded
+- [ ] `template/smoke.sh <name>` lists the expected tools (4 / 14 / 5); `servers/<name>/tools.json` committed
+- [ ] `template/register.sh <name>` → listed by `gcloud agent-registry mcp-servers list --location=eu`
+- [ ] 🔒 GE app: Custom MCP Server data store added with the real `…run.app/mcp` URL; **Reload custom actions** OK; **Enable actions** → all tools
+- [ ] 🔒 GE web app: connector visible under **Custom MCP** in the connector picker; test prompt answered with a tool call
+- [ ] Row added to `docs/deployments.md`
